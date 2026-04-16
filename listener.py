@@ -13,7 +13,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not set")
 
-print("Database URL loaded.")
+print("✓ Database URL loaded.")
 
 # ─── EMAIL CONFIG ─────────────────────────────────────────────
 
@@ -23,8 +23,21 @@ SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 FROM_EMAIL = os.getenv("FROM_EMAIL")
 
-print("Email configuration loaded.")
+required_email_vars = {
+    "SMTP_HOST": SMTP_HOST,
+    "SMTP_USER": SMTP_USER,
+    "SMTP_PASS": SMTP_PASS,
+    "FROM_EMAIL": FROM_EMAIL,
+}
 
+for var, value in required_email_vars.items():
+    if not value:
+        raise Exception(f"Missing email variable: {var}")
+
+print("✓ Email configuration loaded.")
+
+
+# ─── EMAIL FUNCTION ───────────────────────────────────────────
 
 def send_email(
     to_email,
@@ -87,19 +100,35 @@ Time      : {timestamp}
         print("Email error:", e)
 
 
+# ─── DATABASE CONNECTION ──────────────────────────────────────
+
+def connect_db():
+
+    print("Connecting to PostgreSQL...")
+
+    conn = psycopg2.connect(
+        DATABASE_URL,
+        connect_timeout=10
+    )
+
+    conn.set_isolation_level(
+        psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
+    )
+
+    print("✓ Database connected.")
+
+    return conn
+
+
+# ─── LISTENER ─────────────────────────────────────────────────
+
 def start_listener():
 
     while True:
 
         try:
 
-            print("Connecting to PostgreSQL...")
-
-            conn = psycopg2.connect(DATABASE_URL)
-
-            conn.set_isolation_level(
-                psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
-            )
+            conn = connect_db()
 
             cur = conn.cursor()
 
@@ -116,13 +145,24 @@ def start_listener():
 
                     notify = conn.notifies.pop(0)
 
-                    print("Notification received:", notify.payload)
+                    print("\nNotification received:")
+                    print("Payload:", notify.payload)
 
-                    payload = json.loads(notify.payload)
+                    try:
+                        payload = json.loads(notify.payload)
+
+                    except Exception:
+                        print("Invalid JSON payload")
+                        continue
+
+                    print(
+                        f"[EVENT] {payload.get('operation')} "
+                        f"on {payload.get('schema')}."
+                        f"{payload.get('table')}"
+                    )
 
                     emails = [
-                        "samdanis017@gmail.com",
-                        "venu0365@gmail.com"
+                        "venugopalp.in@mouritech.com"
                     ]
 
                     send_email(
@@ -139,13 +179,22 @@ def start_listener():
 
                 time.sleep(0.5)
 
-        except Exception as e:
+        except psycopg2.OperationalError as e:
 
             print("Database connection lost:", e)
             print("Retrying in 5 seconds...")
+            time.sleep(5)
 
+        except Exception as e:
+
+            print("Listener error:", e)
             time.sleep(5)
 
 
+# ─── MAIN ─────────────────────────────────────────────────────
+
 if __name__ == "__main__":
+
+    print("Starting DML listener service...")
+
     start_listener()
