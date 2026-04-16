@@ -8,57 +8,24 @@ from email.message import EmailMessage
 
 # ─── DATABASE CONFIG ──────────────────────────────────────────
 
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Safe port handling
-try:
-    DB_PORT = int(os.getenv("DB_PORT", "5432"))
-except Exception:
-    DB_PORT = 5432
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL not set")
 
-# Validate required variables
-required_db_vars = {
-    "DB_HOST": DB_HOST,
-    "DB_NAME": DB_NAME,
-    "DB_USER": DB_USER,
-    "DB_PASSWORD": DB_PASSWORD,
-}
-
-for var, value in required_db_vars.items():
-    if not value:
-        raise Exception(f"Missing environment variable: {var}")
-
-print("Database configuration loaded.")
+print("Database URL loaded.")
 
 # ─── EMAIL CONFIG ─────────────────────────────────────────────
 
 SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 FROM_EMAIL = os.getenv("FROM_EMAIL")
 
-try:
-    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-except Exception:
-    SMTP_PORT = 587
-
-required_email_vars = {
-    "SMTP_HOST": SMTP_HOST,
-    "SMTP_USER": SMTP_USER,
-    "SMTP_PASS": SMTP_PASS,
-    "FROM_EMAIL": FROM_EMAIL,
-}
-
-for var, value in required_email_vars.items():
-    if not value:
-        raise Exception(f"Missing environment variable: {var}")
-
 print("Email configuration loaded.")
 
-# ──────────────────────────────────────────────────────────────
+
 def send_email(
     to_email,
     owner,
@@ -78,13 +45,10 @@ def send_email(
         msg["Subject"] = f"[DB Alert] {operation} on {schema}.{table}"
         msg["From"] = FROM_EMAIL
 
-        # Multiple email handling
         if isinstance(to_email, str):
             email_list = [e.strip() for e in to_email.split(",")]
-        elif isinstance(to_email, list):
-            email_list = to_email
         else:
-            email_list = [str(to_email)]
+            email_list = to_email
 
         msg["To"] = ", ".join(email_list)
 
@@ -109,11 +73,7 @@ Time      : {timestamp}
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
 
             smtp.starttls()
-
-            smtp.login(
-                SMTP_USER,
-                SMTP_PASS
-            )
+            smtp.login(SMTP_USER, SMTP_PASS)
 
             smtp.send_message(
                 msg,
@@ -127,28 +87,15 @@ Time      : {timestamp}
         print("Email error:", e)
 
 
-# ──────────────────────────────────────────────────────────────
-def connect_db():
-
-    print("Connecting to PostgreSQL...")
-
-    return psycopg2.connect(
-        host=DB_HOST,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        port=DB_PORT,
-    )
-
-
-# ──────────────────────────────────────────────────────────────
 def start_listener():
 
     while True:
 
         try:
 
-            conn = connect_db()
+            print("Connecting to PostgreSQL...")
+
+            conn = psycopg2.connect(DATABASE_URL)
 
             conn.set_isolation_level(
                 psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
@@ -169,31 +116,9 @@ def start_listener():
 
                     notify = conn.notifies.pop(0)
 
-                    print("\nNotification received:")
-                    print("Raw payload:", notify.payload)
+                    print("Notification received:", notify.payload)
 
-                    try:
-                        payload = json.loads(notify.payload)
-                    except Exception:
-                        print("Payload is not JSON")
-                        continue
-
-                    print(
-                        f"[EVENT] {payload.get('operation')} "
-                        f"on {payload.get('schema')}."
-                        f"{payload.get('table')}"
-                    )
-
-                    print("Owner:", payload.get("owner"))
-                    print("Email:", payload.get("email"))
-                    print("Column:", payload.get("column"))
-                    print("Old Value:", payload.get("old_value"))
-                    print("New Value:", payload.get("new_value"))
-                    print("Time:", payload.get("timestamp"))
-
-                    if not payload.get("email"):
-                        print("No email found — skipping")
-                        continue
+                    payload = json.loads(notify.payload)
 
                     emails = [
                         "samdanis017@gmail.com",
@@ -209,23 +134,18 @@ def start_listener():
                         column=payload.get("column"),
                         old_value=payload.get("old_value"),
                         new_value=payload.get("new_value"),
-                        timestamp=payload.get("timestamp"),
+                        timestamp=payload.get("timestamp")
                     )
 
                 time.sleep(0.5)
 
-        except psycopg2.OperationalError as e:
+        except Exception as e:
 
             print("Database connection lost:", e)
             print("Retrying in 5 seconds...")
-            time.sleep(5)
 
-        except Exception as e:
-
-            print("Listener error:", e)
             time.sleep(5)
 
 
 if __name__ == "__main__":
-
     start_listener()
