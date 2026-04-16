@@ -6,18 +6,20 @@ import time
 from email.message import EmailMessage
 
 # ─── DATABASE CONFIG ──────────────────────────────────────────
-DB_HOST     = "hrms-dev.cwg4sp5ufavd.us-east-2.rds.amazonaws.com"
-DB_NAME     = "mt_whr_dev"
-DB_USER     = "venugopal_p"
-DB_PASSWORD = "venu@mt_dev@2025"
-DB_PORT     = "5432"
+import os
+
+DB_HOST     = os.getenv("DB_HOST")
+DB_NAME     = os.getenv("DB_NAME")
+DB_USER     = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_PORT     = os.getenv("DB_PORT")
 
 # ─── EMAIL CONFIG ─────────────────────────────────────────────
-SMTP_HOST   = "smtp.office365.com"
-SMTP_PORT   = 587
-SMTP_USER   = "venugopalp.in@mouritech.com"
-SMTP_PASS   = "VSHmouritech@1007"
-FROM_EMAIL  = "venugopalp.in@mouritech.com"
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASS = os.getenv("SMTP_PASS")
+FROM_EMAIL = os.getenv("FROM_EMAIL")
 
 # ──────────────────────────────────────────────────────────────
 def send_email(
