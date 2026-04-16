@@ -8,6 +8,7 @@ from email.message import EmailMessage
 # ─── DATABASE CONFIG ──────────────────────────────────────────
 import os
 
+# NEW (CORRECT)
 DB_HOST     = os.getenv("DB_HOST")
 DB_NAME     = os.getenv("DB_NAME")
 DB_USER     = os.getenv("DB_USER")
@@ -15,12 +16,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_PORT     = os.getenv("DB_PORT")
 
 # ─── EMAIL CONFIG ─────────────────────────────────────────────
-SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASS = os.getenv("SMTP_PASS")
-FROM_EMAIL = os.getenv("FROM_EMAIL")
-
+SMTP_HOST   = os.getenv("SMTP_HOST")
+SMTP_PORT   = int(os.getenv("SMTP_PORT"))
+SMTP_USER   = os.getenv("SMTP_USER")
+SMTP_PASS   = os.getenv("SMTP_PASS")
+FROM_EMAIL  = os.getenv("FROM_EMAIL")
 # ──────────────────────────────────────────────────────────────
 def send_email(
         to_email,
