@@ -6,16 +6,25 @@ import time
 import os
 from email.message import EmailMessage
 
-# ─── DATABASE CONFIG ──────────────────────────────────────────
+# ─────────────────────────────────────────────
+# DATABASE CONFIG
+# ─────────────────────────────────────────────
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not set")
 
-print("✓ Database URL loaded.")
+# Ensure SSL for corporate networks
+if "sslmode" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL + "?sslmode=require"
 
-# ─── EMAIL CONFIG ─────────────────────────────────────────────
+print("✓ Database URL loaded")
+
+
+# ─────────────────────────────────────────────
+# EMAIL CONFIG
+# ─────────────────────────────────────────────
 
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -34,10 +43,12 @@ for var, value in required_email_vars.items():
     if not value:
         raise Exception(f"Missing email variable: {var}")
 
-print("✓ Email configuration loaded.")
+print("✓ Email configuration loaded")
 
 
-# ─── EMAIL FUNCTION ───────────────────────────────────────────
+# ─────────────────────────────────────────────
+# EMAIL FUNCTION
+# ─────────────────────────────────────────────
 
 def send_email(
     to_email,
@@ -58,6 +69,7 @@ def send_email(
         msg["Subject"] = f"[DB Alert] {operation} on {schema}.{table}"
         msg["From"] = FROM_EMAIL
 
+        # Multiple email support
         if isinstance(to_email, str):
             email_list = [e.strip() for e in to_email.split(",")]
         else:
@@ -86,7 +98,11 @@ Time      : {timestamp}
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
 
             smtp.starttls()
-            smtp.login(SMTP_USER, SMTP_PASS)
+
+            smtp.login(
+                SMTP_USER,
+                SMTP_PASS
+            )
 
             smtp.send_message(
                 msg,
@@ -97,10 +113,13 @@ Time      : {timestamp}
         print("✓ Email sent to:", email_list)
 
     except Exception as e:
+
         print("Email error:", e)
 
 
-# ─── DATABASE CONNECTION ──────────────────────────────────────
+# ─────────────────────────────────────────────
+# DATABASE CONNECTION
+# ─────────────────────────────────────────────
 
 def connect_db():
 
@@ -108,19 +127,22 @@ def connect_db():
 
     conn = psycopg2.connect(
         DATABASE_URL,
-        connect_timeout=10
+        connect_timeout=10,
+        application_name="dml_email_listener"
     )
 
     conn.set_isolation_level(
         psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
     )
 
-    print("✓ Database connected.")
+    print("✓ Database connected")
 
     return conn
 
 
-# ─── LISTENER ─────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# LISTENER
+# ─────────────────────────────────────────────
 
 def start_listener():
 
@@ -145,13 +167,17 @@ def start_listener():
 
                     notify = conn.notifies.pop(0)
 
-                    print("\nNotification received:")
+                    print("\nNotification received")
                     print("Payload:", notify.payload)
 
                     try:
-                        payload = json.loads(notify.payload)
+
+                        payload = json.loads(
+                            notify.payload
+                        )
 
                     except Exception:
+
                         print("Invalid JSON payload")
                         continue
 
@@ -166,15 +192,25 @@ def start_listener():
                     ]
 
                     send_email(
+
                         to_email=emails,
+
                         owner=payload.get("owner"),
+
                         operation=payload.get("operation"),
+
                         schema=payload.get("schema"),
+
                         table=payload.get("table"),
+
                         column=payload.get("column"),
+
                         old_value=payload.get("old_value"),
+
                         new_value=payload.get("new_value"),
+
                         timestamp=payload.get("timestamp")
+
                     )
 
                 time.sleep(0.5)
@@ -182,16 +218,21 @@ def start_listener():
         except psycopg2.OperationalError as e:
 
             print("Database connection lost:", e)
+
             print("Retrying in 5 seconds...")
+
             time.sleep(5)
 
         except Exception as e:
 
             print("Listener error:", e)
+
             time.sleep(5)
 
 
-# ─── MAIN ─────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────
 
 if __name__ == "__main__":
 
